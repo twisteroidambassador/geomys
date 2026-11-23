@@ -1,0 +1,121 @@
+name: Build APKs
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform and build-tools
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager --install "platforms;android-37.0" "build-tools;37.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Test and build debug APK
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug
+
+      - name: Materialize hybrid signing material
+        env:
+          KEYSTORE_B64: ${{ secrets.GEOMYS_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.GEOMYS_KEYSTORE_PASSWORD }}
+          CLASSICAL_LINEAGE_B64: ${{ secrets.GEOMYS_CLASSICAL_LINEAGE_BASE64 }}
+          PQC_LINEAGE_B64: ${{ secrets.GEOMYS_PQC_LINEAGE_BASE64 }}
+          LEGACY_KEY_ALIAS: ${{ secrets.GEOMYS_LEGACY_KEY_ALIAS }}
+          CLASSICAL_KEY_ALIAS: ${{ secrets.GEOMYS_CLASSICAL_KEY_ALIAS }}
+          PQC_KEY_ALIAS: ${{ secrets.GEOMYS_PQC_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          SIGNING_DIR="$RUNNER_TEMP/geomys-signing"
+          mkdir -p "$SIGNING_DIR"
+          chmod 700 "$SIGNING_DIR"
+
+          decode() {
+            local value="$1" file="$2" label="$3"
+            if [ -z "$value" ]; then
+              echo "::error::Missing secret $label" >&2
+              exit 1
+            fi
+            printf '%s' "$value" | base64 --decode > "$file"
+          }
+
+          decode "$KEYSTORE_B64" "$SIGNING_DIR/release.keystore" "GEOMYS_KEYSTORE_BASE64"
+          decode "$CLASSICAL_LINEAGE_B64" "$SIGNING_DIR/release-lineage-classical.bin" "GEOMYS_CLASSICAL_LINEAGE_BASE64"
+          decode "$PQC_LINEAGE_B64" "$SIGNING_DIR/release-lineage-pqc.bin" "GEOMYS_PQC_LINEAGE_BASE64"
+
+          : "${KEYSTORE_PASSWORD:?Missing GEOMYS_KEYSTORE_PASSWORD secret}"
+
+          LEGACY_ALIAS="${LEGACY_KEY_ALIAS:-geomys}"
+          CLASSICAL_ALIAS="${CLASSICAL_KEY_ALIAS:-geomys-hybrid-classical}"
+          PQC_ALIAS="${PQC_KEY_ALIAS:-geomys-hybrid-pqc}"
+          PROPERTIES="$SIGNING_DIR/hybrid-signing.properties"
+
+          {
+            printf 'storeFile=%s\n' "$SIGNING_DIR/release.keystore"
+            printf 'storePassword=%s\n' "$KEYSTORE_PASSWORD"
+            printf 'legacyKeyAlias=%s\n' "$LEGACY_ALIAS"
+            printf 'classicalKeyAlias=%s\n' "$CLASSICAL_ALIAS"
+            printf 'pqcKeyAlias=%s\n' "$PQC_ALIAS"
+            printf 'classicalLineage=%s\n' "$SIGNING_DIR/release-lineage-classical.bin"
+            printf 'pqcLineage=%s\n' "$SIGNING_DIR/release-lineage-pqc.bin"
+          } > "$PROPERTIES"
+
+          chmod 600 "$SIGNING_DIR/release.keystore" "$SIGNING_DIR"/*.bin "$PROPERTIES"
+          echo "HYBRID_SIGNING_PROPERTIES=$PROPERTIES" >> "$GITHUB_ENV"
+
+      - name: Build hybrid release APK
+        env:
+          BUILD_TOOLS_VERSION: '37.0.0'
+        run: ./scripts/build-hybrid-release.sh
+
+      - name: Stage release artifacts
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME//\//-}"
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk "dist/Geomys-${VERSION}-debug.apk"
+          cp app/build/outputs/apk/release/app-hybrid-release.apk "dist/Geomys-${VERSION}-hybrid-release.apk"
+          cp app/build/outputs/mapping/release/mapping.txt "dist/Geomys-${VERSION}-mapping.txt"
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: geomys-apks-${{ github.run_number }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Create GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Geomys ${{ github.ref_name }}
+          generate_release_notes: true
+          files: dist/*
+
+      - name: Remove signing material
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/geomys-signing"
