@@ -1,4 +1,4 @@
-name: Android
+name: Build debug apk
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
           log-accepted-android-sdk-licenses: false
           packages: >
             platform-tools
-            platforms;android-37
+            platforms;android-37.2
             build-tools;37.0.0
 
       - name: Unit tests
