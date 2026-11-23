@@ -1,4 +1,4 @@
-name: Build debug apk
+name: Build debug APK
 
 on:
   push:
@@ -34,7 +34,8 @@ jobs:
       - name: Assemble debug APK
         run: ./gradlew --no-daemon assembleDebug
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: geomys-debug
           path: app/build/outputs/apk/debug/*.apk
+          archive: false

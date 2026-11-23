@@ -1,4 +1,4 @@
-name: Build APKs
+name: Create Release with debug and release APKs
 
 on:
   workflow_dispatch:
@@ -14,26 +14,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up JDK 25
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '25'
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android platform and build-tools
-        run: |
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager --install "platforms;android-37.0" "build-tools;37.0.0"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: android-actions/setup-android@v4
+        with:
+          log-accepted-android-sdk-licenses: false
+          packages: >
+            platform-tools
+            platforms;android-37.2
+            build-tools;37.0.0
 
       - name: Test and build debug APK
         run: ./gradlew --no-daemon testDebugUnitTest assembleDebug
@@ -101,15 +99,15 @@ jobs:
           cp app/build/outputs/mapping/release/mapping.txt "dist/Geomys-${VERSION}-mapping.txt"
 
       - name: Upload APKs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: geomys-apks-${{ github.run_number }}
           path: dist/*
           if-no-files-found: error
 
       - name: Create GitHub release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: Geomys ${{ github.ref_name }}
