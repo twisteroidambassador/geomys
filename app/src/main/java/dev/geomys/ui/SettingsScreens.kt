@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -46,6 +47,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import dev.geomys.BuildConfig
 import dev.geomys.data.ActivityEvent
 import dev.geomys.data.TunnelRepository
@@ -60,27 +63,42 @@ fun SettingsScreen(
     onOpenAbout: () -> Unit,
 ) {
     val context = LocalContext.current
-    val notificationGranted = ContextCompat.checkSelfPermission(
-        context,
-        "android.permission.POST_NOTIFICATIONS",
-    ) == PackageManager.PERMISSION_GRANTED
-    val interactGranted = ContextCompat.checkSelfPermission(
-        context,
-        "android.permission.INTERACT_ACROSS_USERS",
-    ) == PackageManager.PERMISSION_GRANTED
-    val localNetworkGranted = ContextCompat.checkSelfPermission(
-        context,
-        "android.permission.ACCESS_LOCAL_NETWORK",
-    ) == PackageManager.PERMISSION_GRANTED
-    val power = context.getSystemService(PowerManager::class.java)
-    val batteryGranted = power?.isIgnoringBatteryOptimizations(context.packageName) == true
+    val power = remember(context) { context.getSystemService(PowerManager::class.java) }
+    var permissionRefreshKey by remember { mutableIntStateOf(0) }
+
+    val permissions = remember(permissionRefreshKey) {
+        PermissionSnapshot(
+            interact = ContextCompat.checkSelfPermission(
+                context,
+                "android.permission.INTERACT_ACROSS_USERS",
+            ) == PackageManager.PERMISSION_GRANTED,
+            notifications = ContextCompat.checkSelfPermission(
+                context,
+                "android.permission.POST_NOTIFICATIONS",
+            ) == PackageManager.PERMISSION_GRANTED,
+            localNetwork = ContextCompat.checkSelfPermission(
+                context,
+                "android.permission.ACCESS_LOCAL_NETWORK",
+            ) == PackageManager.PERMISSION_GRANTED,
+            battery = power?.isIgnoringBatteryOptimizations(context.packageName) == true,
+        )
+    }
+    val notificationGranted = permissions.notifications
+    val interactGranted = permissions.interact
+    val localNetworkGranted = permissions.localNetwork
+    val batteryGranted = permissions.battery
+
+    // Return from an adb grant, permission dialog, or system settings screen.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        permissionRefreshKey++
+    }
 
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { }
+    ) { permissionRefreshKey++ }
     val localNetworkLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { }
+    ) { permissionRefreshKey++ }
 
     val grantCommand = "adb shell pm grant --user ${vm.myUserId} ${context.packageName} " +
         "android.permission.INTERACT_ACROSS_USERS"
@@ -132,7 +150,19 @@ fun SettingsScreen(
         }
 
         HorizontalDivider()
-        Text("Permissions", style = MaterialTheme.typography.titleMedium)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Permissions",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            TextButton(onClick = { permissionRefreshKey++ }) {
+                Text("Recheck all")
+            }
+        }
         PermissionCard(
             title = "INTERACT_ACROSS_USERS",
             description = "Required to discover and bind to tunneler profiles. This permission " +
@@ -301,3 +331,10 @@ private fun copyToClipboard(context: Context, text: String) {
     val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     manager.setPrimaryClip(ClipData.newPlainText("Geomys command", text))
 }
+
+private data class PermissionSnapshot(
+    val interact: Boolean,
+    val notifications: Boolean,
+    val localNetwork: Boolean,
+    val battery: Boolean,
+)

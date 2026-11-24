@@ -256,8 +256,9 @@ fun ClientEditScreen(
     val dismissKeyboard = rememberKeyboardDismiss()
     var endpointMenu by remember { mutableStateOf(false) }
 
+    // Refresh on every entry to this screen, even when cached profiles exist.
     LaunchedEffect(Unit) {
-        if (discovery.profiles.isEmpty() && !discovery.loading) onRefreshProfiles()
+        onRefreshProfiles()
     }
 
     val selectedProfile = discovery.profiles.firstOrNull { it.info.userId == selectedProfileId }
@@ -323,7 +324,22 @@ fun ClientEditScreen(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Text("Server profile", style = MaterialTheme.typography.labelLarge)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Server profile",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.labelLarge,
+            )
+            TextButton(
+                onClick = onRefreshProfiles,
+                enabled = !discovery.loading,
+            ) {
+                Text(if (discovery.loading) "Refreshing…" else "Refresh")
+            }
+        }
         Box(Modifier.fillMaxWidth()) {
             OutlinedButton(
                 onClick = {
