@@ -28,7 +28,7 @@ Consider your options and risks thoroughly before using it.
 
 - Get the app:
   - Download an APK from [Latest Release](https://github.com/twisteroidambassador/geomys/releases/latest) and install manually, or
-  - To get automatic updates, install [Obtainium](https://obtainium.imranr.dev/) or [ObtainX](https://github.com/bikram-agarwal/ObtainX) first, then [click to add this app](obtainium://app/%7B%22id%22%3A%20%22io.github.twisteroidambassador.geomys%22%2C%20%22url%22%3A%20%22https%3A//github.com/twisteroidambassador/geomys%22%2C%20%22author%22%3A%20%22twisteroidambassador%22%2C%20%22name%22%3A%20%22Geomys%22%7D).
+  - To get automatic updates, install [Obtainium](https://obtainium.imranr.dev/) or [ObtainX](https://github.com/bikram-agarwal/ObtainX) first, then [click to add this app](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%20%22io.github.twisteroidambassador.geomys%22%2C%20%22url%22%3A%20%22https%3A//github.com/twisteroidambassador/geomys%22%2C%20%22author%22%3A%20%22twisteroidambassador%22%2C%20%22name%22%3A%20%22Geomys%22%7D).
   - Either way, choose the "hybrid release" variant unless you have specific requirements.
 - Install Geomys into all user profiles / Private Space / work profiles where you want to access other profiles (client) / have something to be accessed (server).
   - Usually, there is a method in the UI to install apps already in the main owner profile into other profiles or Private Space, such as Settings -> System -> Users -> *a specific user* -> Install available apps.
