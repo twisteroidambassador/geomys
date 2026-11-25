@@ -4,6 +4,9 @@
 
 *Localhost Networking Across Profiles on Android 17*
 
+[<img src="docs/assets/badge_github.png" alt="Get it on GitHub" height="80">](https://github.com/twisteroidambassador/geomys/releases/latest)
+[<img src="docs/assets/badge_obtainium.png" alt="Get it on Obtainium or ObtainX" height="80">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%20%22io.github.twisteroidambassador.geomys%22%2C%20%22url%22%3A%20%22https%3A//github.com/twisteroidambassador/geomys%22%2C%20%22author%22%3A%20%22twisteroidambassador%22%2C%20%22name%22%3A%20%22Geomys%22%7D)
+
 On Android 17, localhost networking is blocked between user profiles (or Private Space, or work profile).
 If you host an HTTP server with `termux` in the owner profile,
 you cannot access that from a browser in a secondary profile.
@@ -11,13 +14,52 @@ you cannot access that from a browser in a secondary profile.
 **Geomys** is created to break that barrier.
 It can relay both TCP and UDP network traffic across profile boundaries.
 
+<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp" alt="Geomys app icon">
+
 ### Disclaimer
 
 The localhost block is a security feature.
 By using Geomys, you are intentionally bypassing that security feature.
 Consider your options and risks thoroughly before using it.
 
-## How it Works
+## How to Use
+
+### Installation
+
+- Get the app:
+  - Download an APK from [Latest Release](https://github.com/twisteroidambassador/geomys/releases/latest) and install manually, or
+  - To get automatic updates, install [Obtainium](https://obtainium.imranr.dev/) or [ObtainX](https://github.com/bikram-agarwal/ObtainX) first, then [click to add this app](obtainium://app/%7B%22id%22%3A%20%22io.github.twisteroidambassador.geomys%22%2C%20%22url%22%3A%20%22https%3A//github.com/twisteroidambassador/geomys%22%2C%20%22author%22%3A%20%22twisteroidambassador%22%2C%20%22name%22%3A%20%22Geomys%22%7D).
+  - Either way, choose the "hybrid release" variant unless you have specific requirements.
+- Install Geomys into all user profiles / Private Space / work profiles where you want to access other profiles (client) / have something to be accessed (server).
+  - Usually, there is a method in the UI to install apps already in the main owner profile into other profiles or Private Space, such as Settings -> System -> Users -> *a specific user* -> Install available apps.
+  - Alternatively, install using the same APK file inside the profile.
+- Grant required permissions:
+  - The `INTERACT_ACROSS_USERS` permission can only be granted via ADB. 
+    From a PC: 
+    ```shell
+    # List user profiles
+    adb shell pm list users
+    # Grant permission for a specific profile
+    adb shell pm grant --user <userid> io.github.twisteroidambassador.geomys android.permission.INTERACT_ACROSS_USERS
+    ```
+    Granting this permission via Shizuku, termux + wireless adb, etc. is left as an exercise for the reader.
+  - More mundane permissions can be granted in the app's Settings tab. While you are there, set the profile label to something you recognize.
+
+### Usage
+
+- In the profile where you have something you want to access from another profile, launch Geomys and add a server.
+Configure the protocol, target host and port to point to the server, and optionally a name.
+- In the profile where you want to access the server, launch Geomys and add a client.
+Choose the profile containing the server, then the server endpoint added above.
+Configure a bind host and port.
+  - Note: the client bind (host, port) cannot be the same as the server's target (host, port).
+Even though it's not accessible from the client profile, the port is still occupied and cannot be reused.
+  - Remember the entire IPv4 `127.0.0.0/8` subnet is loopback, so feel free to use something like `127.123.45.67` for the bind address and reuse the port number.
+- Now, point the client app to the bind host and port, and it should reach the server inside the server profile.
+
+## Information
+
+### How inter-profile communication works
 
 Interaction across profiles is usually limited to system apps or otherwise OEM apps,
 i.e. gated behind permissions with `protectionLevel`s of `signature|privileged`.
@@ -36,35 +78,24 @@ sends whatever it receives across the socket pair to the server profile,
 where Geomys in the server profile forwards the data to the actual server.
 Same thing in the other direction.
 
-## How to Use
+### APK Signing
 
-### Installation
+This app is signed with post-quantum cryptography, introduced with APK Signature Scheme v3.2 (Android 17, API level 37).
+This means there are 3 signing keys (history, hybrid-classical, hybrid-pqc), and therefore 3 fingerprints:
 
-Download the apk from Releases and install manually, or use Obtainium / ObtainX.
+```
+Certificate fingerprint (SHA-256): 18:1F:A0:C1:62:5E:7E:A3:9E:A9:B4:16:6D:BB:11:45:19:36:A6:F1:0D:53:B3:0F:6F:BD:E8:0C:D3:F4:E4:BF
+Certificate fingerprint (SHA-256): DE:39:CB:EE:C3:C3:94:82:AD:19:EB:51:CC:FB:F1:00:51:DA:9B:3B:A4:0A:3F:BA:2E:DB:66:42:F7:DB:8E:52
+Certificate fingerprint (SHA-256): 41:00:46:F1:15:95:4B:5F:43:35:47:CD:79:18:F9:70:3E:31:71:46:62:4E:DC:2C:8F:68:95:77:B9:6C:BA:31
+```
 
-Install into all user profiles / Private Space / work profiles where you want to access other profiles (client) / have something to be accessed (server).
+### Google Developer Verification
 
-After installation, launch the app and switch to the Settings tab.
-Make sure the `INTERACT_ACROSS_USERS`, notifications and unrestricted battery usage permissions are granted.
-The local network permission is not necessary, unless using non-loopback addresses.
-Optionally, change the Profile label to something you can recognize.
+I have no plans for enrolling myself as a Google-verified developer.
+This may hurt your ability to install Geomys in the near future.
+[Keep Android Open](https://keepandroidopen.org/faq/)
 
-### Usage
-
-In the profile where you have something you want to access from another profile, launch Geomys and add a server.
-Configure the protocol, target host and port to point to the server, and optionally a name.
-
-In the profile where you want to access the server, launch Geomys and add a client.
-Choose the profile containing the server, then the server endpoint added above.
-Configure a bind host and port.
-
-Note: the client bind (host, port) cannot be the same as the server's target (host, port).
-Even though it's not accessible from the client profile, the port is still occupied and cannot be reused.
-Remember the entire IPv4 `127.0.0.0/8` subnet is loopback, so feel free to use something like `127.123.45.67` for the bind address and reuse the port number.
-
-Now, point the client app to the bind host and port, and it should reach the server inside the server profile.
-
-## Statement regarding AI Usage
+### Statement regarding AI Usage
 
 This repository contains substantial LLM-generated material.
 Consider everything AI generated, excluding this marked segment in the README file.
@@ -91,13 +122,6 @@ loopback instead of the cross-profile loopback that Android 17 blocks.
 
 > **Status: alpha.** This is not production security software. Read
 > [Security and limitations](#security-and-limitations) before using it.
-
-## Screenshots
-
-| Server tab | Client tab |
-| --- | --- |
-| ![Server tab](docs/screenshots/server.png) | ![Client tab](docs/screenshots/client.png) |
-
 
 ## How it works
 
